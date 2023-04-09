@@ -139,3 +139,26 @@ func SignBar(bar *BarRegister) error {
 	DB.Create(&Bar{IdBar: bar.IdBar, Password: string(hashedPassword)})
 	return err
 }
+
+func CheckSessionBar(r *http.Request) (bool, Bar) {
+	session, _ := store.Get(r, "session-name")
+
+	var bar Bar
+
+	if session.IsNew {
+		fmt.Println("not sessions")
+		return false, bar
+	}
+
+	err := DB.First(&bar, "id_bar = ?", session.Values["idBar"]).Error
+
+	if err != nil {
+		fmt.Println("error db")
+		return false, bar
+	}
+
+	if session.Values["password"] != bar.Password {
+		return false, bar
+	}
+	return true, bar
+}

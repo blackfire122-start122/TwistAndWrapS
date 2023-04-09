@@ -88,14 +88,12 @@ func LoginUser(c *gin.Context) {
 }
 
 func GetAllProducts(c *gin.Context) {
-	//loginUser, user := CheckSessionUser(c.Request)
+	loginBar, _ := CheckSessionBar(c.Request)
 
-	// To Do: check if restoran
-
-	//if !loginUser{
-	//	c.Writer.WriteHeader(http.StatusUnauthorized)
-	//	return
-	//}
+	if !loginBar {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	var products []Product
 
