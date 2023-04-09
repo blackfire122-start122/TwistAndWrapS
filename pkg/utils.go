@@ -91,3 +91,51 @@ func CheckAdmin(user User) bool {
 
 	return admin.UserId == user.Id
 }
+
+type BarLogin struct {
+	IdBar    string
+	Password string
+}
+
+func LoginB(w http.ResponseWriter, r *http.Request, barLogin *BarLogin) bool {
+	session, _ := store.Get(r, "session-name")
+
+	var bar Bar
+	err := DB.First(&bar, "id_bar = ?", barLogin.IdBar).Error
+
+	if err != nil {
+		fmt.Println("error db")
+		return false
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(bar.Password), []byte(barLogin.Password))
+	if err == nil {
+		session.Values["idBar"] = bar.IdBar
+		session.Values["password"] = bar.Password
+
+		err = session.Save(r, w)
+		if err != nil {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	return true
+}
+
+type BarRegister struct {
+	IdBar    string
+	Password string
+}
+
+func SignBar(bar *BarRegister) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(bar.Password), bcrypt.DefaultCost)
+
+	if err != nil {
+		return err
+	}
+
+	DB.Create(&Bar{IdBar: bar.IdBar, Password: string(hashedPassword)})
+	return err
+}

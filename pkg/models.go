@@ -30,6 +30,13 @@ type Product struct {
 	Name  string
 }
 
+type Bar struct {
+	gorm.Model
+	Id       uint64 `gorm:"primaryKey"`
+	IdBar    string
+	Password string
+}
+
 func init() {
 	db, err := gorm.Open(sqlite.Open("database.db"), &gorm.Config{})
 	DB = db
@@ -38,7 +45,7 @@ func init() {
 		panic("failed to connect database")
 	}
 
-	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{})
+	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, Bar{})
 	if err != nil {
 		panic("Error automigrate: ")
 	}

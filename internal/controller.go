@@ -88,9 +88,9 @@ func LoginUser(c *gin.Context) {
 }
 
 func GetAllProducts(c *gin.Context) {
-	//loginUser, user := CheckSesionUser(c.Request)
+	//loginUser, user := CheckSessionUser(c.Request)
 
-	// To Do: check if restouran
+	// To Do: check if restoran
 
 	//if !loginUser{
 	//	c.Writer.WriteHeader(http.StatusUnauthorized)
@@ -115,5 +115,56 @@ func GetAllProducts(c *gin.Context) {
 		resp[i] = item
 	}
 
+	c.JSON(http.StatusOK, resp)
+}
+
+func LoginBar(c *gin.Context) {
+	resp := make(map[string]string)
+
+	var bar BarLogin
+	bodyBytes, _ := io.ReadAll(c.Request.Body)
+
+	if err := json.Unmarshal(bodyBytes, &bar); err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if LoginB(c.Writer, c.Request, &bar) {
+		resp["Login"] = "OK"
+		c.JSON(http.StatusOK, resp)
+	} else {
+		resp["Login"] = "error login bar"
+		c.JSON(http.StatusForbidden, resp)
+	}
+}
+
+func RegisterBar(c *gin.Context) {
+	resp := make(map[string]string)
+
+	var bar BarRegister
+	bodyBytes, _ := io.ReadAll(c.Request.Body)
+
+	if err := json.Unmarshal(bodyBytes, &bar); err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("here")
+
+	if bar.Password == "" || bar.IdBar == "" {
+		resp["Register"] = "Not all field"
+
+		c.JSON(http.StatusBadRequest, resp)
+		return
+	}
+
+	if err := SignBar(&bar); err != nil {
+		resp["Register"] = "Error create user"
+
+		c.JSON(http.StatusBadRequest, resp)
+		return
+	}
+
+	resp["Register"] = "OK"
 	c.JSON(http.StatusOK, resp)
 }
