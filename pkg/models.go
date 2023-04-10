@@ -25,9 +25,17 @@ type Admin struct {
 
 type Product struct {
 	gorm.Model
-	Id    uint64 `gorm:"primaryKey"`
-	Image string
-	Name  string
+	Id          uint64 `gorm:"primaryKey"`
+	Image       string
+	Name        string
+	Type        TypeProduct `gorm:"foreignKey:TypeId"`
+	TypeId      uint64
+	Description string
+}
+
+type TypeProduct struct {
+	gorm.Model
+	Type string
 }
 
 type Bar struct {
@@ -45,7 +53,7 @@ func init() {
 		panic("failed to connect database")
 	}
 
-	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, Bar{})
+	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, &Bar{}, &TypeProduct{})
 	if err != nil {
 		panic("Error automigrate: ")
 	}

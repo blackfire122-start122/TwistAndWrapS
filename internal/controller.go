@@ -157,3 +157,34 @@ func RegisterBar(c *gin.Context) {
 	resp["Register"] = "OK"
 	c.JSON(http.StatusOK, resp)
 }
+
+func GetAllFoods(c *gin.Context) {
+	loginUser, _ := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var products []Product
+
+	if err := DB.Preload("Type").Find(&products).Error; err != nil {
+		fmt.Println("error get products")
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	resp := make([]map[string]string, len(products))
+
+	for i, product := range products {
+		item := make(map[string]string)
+		item["Id"] = strconv.FormatUint(product.Id, 10)
+		item["Name"] = product.Name
+		item["Image"] = product.Image
+		item["Type"] = product.Type.Type
+		item["Description"] = product.Description
+		resp[i] = item
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
