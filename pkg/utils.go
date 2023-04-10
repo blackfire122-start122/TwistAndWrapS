@@ -43,14 +43,13 @@ func Login(w http.ResponseWriter, r *http.Request, userLogin *UserLogin) bool {
 }
 
 type UserRegister struct {
-	Username  string
-	Password1 string
-	Password2 string
-	Email     string
+	Username string
+	Password string
+	Email    string
 }
 
 func Sign(user *UserRegister) error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password1), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 
 	if err != nil {
 		return err

@@ -38,17 +38,8 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("here")
-
-	if user.Password1 == "" || user.Username == "" {
+	if user.Password == "" || user.Username == "" {
 		resp["Register"] = "Not all field"
-
-		c.JSON(http.StatusBadRequest, resp)
-		return
-	}
-
-	if user.Password1 != user.Password2 {
-		resp["Register"] = "Not equal passwords"
 
 		c.JSON(http.StatusBadRequest, resp)
 		return
