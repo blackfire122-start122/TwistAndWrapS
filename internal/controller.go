@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -23,6 +25,8 @@ func GetUser(c *gin.Context) {
 	resp["Id"] = strconv.FormatUint(user.Id, 10)
 	resp["Username"] = user.Username
 	resp["Email"] = user.Email
+	resp["Phone"] = user.Phone
+	resp["Image"] = user.Image
 
 	c.JSON(http.StatusOK, resp)
 }
@@ -185,6 +189,58 @@ func GetAllFoods(c *gin.Context) {
 		item["Description"] = product.Description
 		resp[i] = item
 	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+type Form struct {
+	Username string                `form:"Username" binding:"required"`
+	Email    string                `form:"Email" binding:"required"`
+	Phone    string                `form:"Phone" binding:"required"`
+	Image    *multipart.FileHeader `form:"Image" binding:"required"`
+}
+
+func ChangeUser(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	resp := make(map[string]string)
+	var form Form
+	if err := c.ShouldBind(&form); err != nil {
+		fmt.Println(err)
+	}
+
+	var ImageName string
+
+	if form.Image.Filename == "" && form.Image.Size == 0 {
+		ImageName = user.Image
+	} else {
+		if err := c.SaveUploadedFile(form.Image, "./media/UserImages/"+user.Username+form.Image.Filename); err != nil {
+			fmt.Println(err)
+		}
+		if err := os.Remove("./" + user.Image); err != nil {
+			fmt.Println(err)
+		}
+		ImageName = "media/UserImages/" + user.Username + form.Image.Filename
+	}
+
+	if err := DB.Save(&User{Id: user.Id, Username: form.Username, Image: ImageName, Email: form.Email, Phone: form.Phone, Password: user.Password}).Error; err != nil {
+		fmt.Println(err)
+	}
+
+	if err := DB.First(&user).Error; err != nil {
+		fmt.Println(err)
+	}
+
+	resp["Id"] = strconv.FormatUint(user.Id, 10)
+	resp["Username"] = user.Username
+	resp["Email"] = user.Email
+	resp["Phone"] = user.Phone
+	resp["Image"] = user.Image
 
 	c.JSON(http.StatusOK, resp)
 }

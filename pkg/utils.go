@@ -28,9 +28,8 @@ func Login(w http.ResponseWriter, r *http.Request, userLogin *UserLogin) bool {
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userLogin.Password))
 	if err == nil {
-		session.Values["username"] = user.Username
+		session.Values["id"] = user.Id
 		session.Values["password"] = user.Password
-
 		err = session.Save(r, w)
 		if err != nil {
 			return false
@@ -69,8 +68,8 @@ func CheckSessionUser(r *http.Request) (bool, User) {
 		return false, user
 	}
 
-	err := DB.First(&user, "Username = ?", session.Values["username"]).Error
-
+	err := DB.First(&user, "Id = ?", session.Values["id"]).Error
+	fmt.Println(user)
 	if err != nil {
 		fmt.Println("error db")
 		return false, user

@@ -14,6 +14,7 @@ type User struct {
 	Password string
 	Email    string
 	Phone    string
+	Image    string
 }
 
 type Admin struct {
