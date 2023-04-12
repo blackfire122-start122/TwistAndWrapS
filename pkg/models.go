@@ -36,6 +36,7 @@ type Product struct {
 
 type TypeProduct struct {
 	gorm.Model
+	Id   uint64 `gorm:"primaryKey"`
 	Type string
 }
 

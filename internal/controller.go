@@ -20,6 +20,14 @@ func GetUser(c *gin.Context) {
 		return
 	}
 
+	var admin string
+
+	if CheckAdmin(user) {
+		admin = "true"
+	} else {
+		admin = "false"
+	}
+
 	resp := make(map[string]string)
 
 	resp["Id"] = strconv.FormatUint(user.Id, 10)
@@ -27,6 +35,7 @@ func GetUser(c *gin.Context) {
 	resp["Email"] = user.Email
 	resp["Phone"] = user.Phone
 	resp["Image"] = user.Image
+	resp["IsAdmin"] = admin
 
 	c.JSON(http.StatusOK, resp)
 }
@@ -163,13 +172,6 @@ func RegisterBar(c *gin.Context) {
 }
 
 func GetAllFoods(c *gin.Context) {
-	loginUser, _ := CheckSessionUser(c.Request)
-
-	if !loginUser {
-		c.Writer.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	var products []Product
 
 	if err := DB.Preload("Type").Find(&products).Error; err != nil {
@@ -193,7 +195,7 @@ func GetAllFoods(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-type Form struct {
+type FormChangeUser struct {
 	Username string                `form:"Username" binding:"required"`
 	Email    string                `form:"Email" binding:"required"`
 	Phone    string                `form:"Phone" binding:"required"`
@@ -209,7 +211,7 @@ func ChangeUser(c *gin.Context) {
 	}
 
 	resp := make(map[string]string)
-	var form Form
+	var form FormChangeUser
 	if err := c.ShouldBind(&form); err != nil {
 		fmt.Println(err)
 	}
@@ -232,7 +234,7 @@ func ChangeUser(c *gin.Context) {
 		fmt.Println(err)
 	}
 
-	if err := DB.First(&user).Error; err != nil {
+	if err := DB.First(&user, "id = ?", user.Id).Error; err != nil {
 		fmt.Println(err)
 	}
 
@@ -241,6 +243,92 @@ func ChangeUser(c *gin.Context) {
 	resp["Email"] = user.Email
 	resp["Phone"] = user.Phone
 	resp["Image"] = user.Image
+
+	c.JSON(http.StatusOK, resp)
+}
+
+type FormCreateProduct struct {
+	Type        string                `form:"Type" binding:"required"`
+	Name        string                `form:"Name" binding:"required"`
+	Description string                `form:"Description" binding:"required"`
+	File        *multipart.FileHeader `form:"File" binding:"required"`
+}
+
+func CreateProduct(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+	fmt.Println("here")
+	var form FormCreateProduct
+	if err := c.ShouldBind(&form); err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println("here")
+
+	var FileName string
+
+	if form.File.Filename == "" && form.File.Size == 0 {
+		FileName = ""
+	} else {
+		if err := c.SaveUploadedFile(form.File, "./media/ProductImages/"+form.Name+form.Type+form.File.Filename); err != nil {
+			fmt.Println(err)
+		}
+		FileName = "media/ProductImages/" + form.Name + form.Type + form.File.Filename
+	}
+	fmt.Println("here")
+
+	typeProductId, err := strconv.ParseUint(form.Type, 10, 64)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("here")
+
+	if err := DB.Create(&Product{Image: FileName, Name: form.Name, TypeId: typeProductId, Description: form.Description}).Error; err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("here")
+
+}
+
+func GetTypes(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	var types []TypeProduct
+
+	if err := DB.Find(&types).Error; err != nil {
+		fmt.Println("error get types")
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	resp := make([]map[string]string, len(types))
+
+	for i, typeItem := range types {
+		item := make(map[string]string)
+		item["Id"] = strconv.FormatUint(typeItem.Id, 10)
+		item["Type"] = typeItem.Type
+
+		resp[i] = item
+	}
 
 	c.JSON(http.StatusOK, resp)
 }
