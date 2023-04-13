@@ -332,3 +332,33 @@ func GetTypes(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+func GetAllBars(c *gin.Context) {
+	loginUser, _ := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var bars []Bar
+
+	if err := DB.Find(&bars).Error; err != nil {
+		fmt.Println("error get bars")
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	resp := make([]map[string]string, len(bars))
+
+	for i, bar := range bars {
+		item := make(map[string]string)
+		item["Id"] = strconv.FormatUint(bar.Id, 10)
+		item["IdBar"] = bar.IdBar
+		item["Address"] = bar.Address
+
+		resp[i] = item
+	}
+
+	c.JSON(http.StatusOK, resp)
+}

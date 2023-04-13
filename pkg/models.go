@@ -43,6 +43,7 @@ type TypeProduct struct {
 type Bar struct {
 	gorm.Model
 	Id       uint64 `gorm:"primaryKey"`
+	Address  string
 	IdBar    string
 	Password string
 }
