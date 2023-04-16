@@ -62,7 +62,6 @@ func receiver(client *ClientBar) {
 		m.Client = client
 
 		if m.Type == "createOrder" {
-			fmt.Println(m)
 			BroadcastReceiver <- &m
 		}
 	}

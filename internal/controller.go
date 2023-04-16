@@ -392,7 +392,16 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
+	foodIdCount := make(map[uint64]int64)
 	for _, food := range form.Foods {
+		foodId, err := strconv.ParseUint(food.Id, 10, 64)
+
+		if err != nil {
+			fmt.Println(err)
+			c.Writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		foodCount, err := strconv.ParseInt(food.Count, 10, 64)
 
 		if err != nil {
@@ -400,21 +409,32 @@ func OrderFood(c *gin.Context) {
 			c.Writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
 		if foodCount < 1 || foodCount > 10 {
 			c.Writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		foodIdCount[foodId] = foodCount
 	}
 
 	var bar Bar
-	DB.First(&bar, "id_bar = ?", form.RestaurantId)
+	if err := DB.First(&bar, "id_bar = ?", form.RestaurantId).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	msg, err := json.Marshal(foodIdCount)
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	for cl, _ := range Clients {
 		if cl.Bar.IdBar == bar.IdBar {
-			Broadcast <- &Message{Type: "createOrder", Msg: "1 cola", Client: cl}
+			Broadcast <- &Message{Type: "createOrder", Msg: string(msg), Client: cl}
 			for {
 				m := <-BroadcastReceiver
-				fmt.Println("with BroadcastReceiver: ", m, cl, m.Client == cl)
 				if m.Client == cl {
 					c.JSON(http.StatusOK, respCreate{Type: m.Type, Msg: m.Msg})
 					break
