@@ -26,5 +26,6 @@ func main() {
 	router := gin.Default()
 	router.Use(CORSMiddleware())
 	internal.SetRouters(router)
+	go internal.Broadcaster()
 	router.Run("localhost:8080")
 }

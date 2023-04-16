@@ -151,9 +151,7 @@ func RegisterBar(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("here")
-
-	if bar.Password == "" || bar.IdBar == "" {
+	if bar.Password == "" || bar.IdBar == "" || bar.LngLatX == "" || bar.LngLatY == "" {
 		resp["Register"] = "Not all field"
 
 		c.JSON(http.StatusBadRequest, resp)
@@ -266,13 +264,12 @@ func CreateProduct(c *gin.Context) {
 		c.Writer.WriteHeader(http.StatusForbidden)
 		return
 	}
-	fmt.Println("here")
+
 	var form FormCreateProduct
 	if err := c.ShouldBind(&form); err != nil {
 		fmt.Println(err)
+		return
 	}
-
-	fmt.Println("here")
 
 	var FileName string
 
@@ -284,19 +281,19 @@ func CreateProduct(c *gin.Context) {
 		}
 		FileName = "media/ProductImages/" + form.Name + form.Type + form.File.Filename
 	}
-	fmt.Println("here")
 
 	typeProductId, err := strconv.ParseUint(form.Type, 10, 64)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
-	fmt.Println("here")
 
 	if err := DB.Create(&Product{Image: FileName, Name: form.Name, TypeId: typeProductId, Description: form.Description}).Error; err != nil {
 		fmt.Println(err)
+		return
 	}
-	fmt.Println("here")
 
+	c.Writer.WriteHeader(http.StatusOK)
 }
 
 func GetTypes(c *gin.Context) {
@@ -356,9 +353,73 @@ func GetAllBars(c *gin.Context) {
 		item["Id"] = strconv.FormatUint(bar.Id, 10)
 		item["IdBar"] = bar.IdBar
 		item["Address"] = bar.Address
+		item["LngLatX"] = strconv.FormatFloat(bar.LngLatX, 'f', -1, 64)
+		item["LngLatY"] = strconv.FormatFloat(bar.LngLatY, 'f', -1, 64)
 
 		resp[i] = item
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+type Food struct {
+	Id    string `json:"Id"`
+	Count string `json:"Count"`
+}
+
+type Order struct {
+	RestaurantId string `json:"RestaurantId"`
+	Foods        []Food `json:"Foods"`
+}
+
+type respCreate struct {
+	Type string
+	Msg  string
+}
+
+func OrderFood(c *gin.Context) {
+	loginUser, _ := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	var form Order
+	if err := c.ShouldBind(&form); err != nil {
+		fmt.Println(err)
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for _, food := range form.Foods {
+		foodCount, err := strconv.ParseInt(food.Count, 10, 64)
+
+		if err != nil {
+			fmt.Println(err)
+			c.Writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if foodCount < 1 || foodCount > 10 {
+			c.Writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	var bar Bar
+	DB.First(&bar, "id_bar = ?", form.RestaurantId)
+
+	for cl, _ := range Clients {
+		if cl.Bar.IdBar == bar.IdBar {
+			Broadcast <- &Message{Type: "createOrder", Msg: "1 cola", Client: cl}
+			for {
+				m := <-BroadcastReceiver
+				fmt.Println("with BroadcastReceiver: ", m, cl, m.Client == cl)
+				if m.Client == cl {
+					c.JSON(http.StatusOK, respCreate{Type: m.Type, Msg: m.Msg})
+					break
+				}
+			}
+		}
+	}
 }

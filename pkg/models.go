@@ -46,6 +46,8 @@ type Bar struct {
 	Address  string
 	IdBar    string
 	Password string
+	LngLatX  float64
+	LngLatY  float64
 }
 
 func init() {
