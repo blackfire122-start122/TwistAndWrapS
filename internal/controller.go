@@ -392,7 +392,7 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
-	foodIdCount := make(map[uint64]int64)
+	foodIdCount := make(map[uint64]uint8)
 	for _, food := range form.Foods {
 		foodId, err := strconv.ParseUint(food.Id, 10, 64)
 
@@ -402,7 +402,7 @@ func OrderFood(c *gin.Context) {
 			return
 		}
 
-		foodCount, err := strconv.ParseInt(food.Count, 10, 64)
+		foodCount, err := strconv.ParseUint(food.Count, 10, 8)
 
 		if err != nil {
 			fmt.Println(err)
@@ -415,7 +415,7 @@ func OrderFood(c *gin.Context) {
 			return
 		}
 
-		foodIdCount[foodId] = foodCount
+		foodIdCount[foodId] = uint8(foodCount)
 	}
 
 	var bar Bar
