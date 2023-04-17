@@ -330,7 +330,7 @@ func GetTypes(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func GetAllBars(c *gin.Context) {
+func GetAllWorkedBars(c *gin.Context) {
 	loginUser, _ := CheckSessionUser(c.Request)
 
 	if !loginUser {
@@ -340,10 +340,14 @@ func GetAllBars(c *gin.Context) {
 
 	var bars []Bar
 
-	if err := DB.Find(&bars).Error; err != nil {
-		fmt.Println("error get bars")
-		c.Writer.WriteHeader(http.StatusBadRequest)
-		return
+	//if err := DB.Find(&bars).Error; err != nil {
+	//	fmt.Println("error get bars")
+	//	c.Writer.WriteHeader(http.StatusBadRequest)
+	//	return
+	//}
+
+	for bar, _ := range Clients {
+		bars = append(bars, bar.Bar)
 	}
 
 	resp := make([]map[string]string, len(bars))
@@ -370,11 +374,17 @@ type Food struct {
 type Order struct {
 	RestaurantId string `json:"RestaurantId"`
 	Foods        []Food `json:"Foods"`
+	Time         string `json:"Time"`
 }
 
 type respCreate struct {
 	Type string
 	Msg  string
+}
+
+type MsgToBarCreateOrder struct {
+	FoodIdCount map[uint64]uint8
+	Time        string
 }
 
 func OrderFood(c *gin.Context) {
@@ -424,7 +434,7 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
-	msg, err := json.Marshal(foodIdCount)
+	msg, err := json.Marshal(MsgToBarCreateOrder{FoodIdCount: foodIdCount, Time: form.Time})
 	if err != nil {
 		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
