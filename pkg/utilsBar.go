@@ -5,6 +5,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type BarLogin struct {
@@ -41,30 +42,33 @@ func LoginB(w http.ResponseWriter, r *http.Request, barLogin *BarLogin) bool {
 
 type BarRegister struct {
 	IdBar    string
+	Address  string
 	Password string
 	LngLatX  string
 	LngLatY  string
 }
 
-func SignBar(bar *BarRegister) error {
+func SignBar(bar *BarRegister) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(bar.Password), bcrypt.DefaultCost)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	lngLatY, err := strconv.ParseFloat(bar.LngLatY, 10)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	lngLatX, err := strconv.ParseFloat(bar.LngLatX, 10)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	DB.Create(&Bar{IdBar: bar.IdBar, Password: string(hashedPassword), LngLatY: lngLatY, LngLatX: lngLatX})
-	return err
+	bar.IdBar = GenerateIdBar(lngLatY, lngLatX)
+
+	DB.Create(&Bar{IdBar: bar.IdBar, Password: string(hashedPassword), Address: bar.Address, LngLatY: lngLatY, LngLatX: lngLatX})
+	return bar.IdBar, err
 }
 
 func CheckSessionBar(r *http.Request) (bool, Bar) {
@@ -88,4 +92,11 @@ func CheckSessionBar(r *http.Request) (bool, Bar) {
 		return false, bar
 	}
 	return true, bar
+}
+
+func GenerateIdBar(lngLatY float64, lngLatX float64) string {
+	id := strconv.FormatFloat(lngLatY, 'f', -1, 64) + strconv.FormatFloat(lngLatX, 'f', -1, 64)
+	id = strings.ReplaceAll(id, ".", "")
+	id = strings.ReplaceAll(id, "-", "")
+	return id
 }

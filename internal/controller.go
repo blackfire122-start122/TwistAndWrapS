@@ -141,6 +141,18 @@ func LoginBar(c *gin.Context) {
 }
 
 func RegisterBar(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
 	resp := make(map[string]string)
 
 	var bar BarRegister
@@ -151,21 +163,22 @@ func RegisterBar(c *gin.Context) {
 		return
 	}
 
-	if bar.Password == "" || bar.IdBar == "" || bar.LngLatX == "" || bar.LngLatY == "" {
+	if bar.Password == "" || bar.LngLatX == "" || bar.LngLatY == "" || bar.Address == "" {
 		resp["Register"] = "Not all field"
-
 		c.JSON(http.StatusBadRequest, resp)
 		return
 	}
 
-	if err := SignBar(&bar); err != nil {
-		resp["Register"] = "Error create user"
+	idBar, err := SignBar(&bar)
+	if err != nil {
+		resp["Register"] = "Error create bar"
 
 		c.JSON(http.StatusBadRequest, resp)
 		return
 	}
 
 	resp["Register"] = "OK"
+	resp["IdBar"] = idBar
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -339,12 +352,6 @@ func GetAllWorkedBars(c *gin.Context) {
 	}
 
 	var bars []Bar
-
-	//if err := DB.Find(&bars).Error; err != nil {
-	//	fmt.Println("error get bars")
-	//	c.Writer.WriteHeader(http.StatusBadRequest)
-	//	return
-	//}
 
 	for bar, _ := range Clients {
 		bars = append(bars, bar.Bar)
