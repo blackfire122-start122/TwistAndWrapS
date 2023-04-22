@@ -2,12 +2,13 @@ package main
 
 import (
 	"TwistAndWrapS/internal"
+	"fmt"
 	"github.com/gin-gonic/gin"
 )
 
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// in deploy need be set gloabal ip
+		// in deploy need be set global ip
 		c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
@@ -27,5 +28,8 @@ func main() {
 	router.Use(CORSMiddleware())
 	internal.SetRouters(router)
 	go internal.Broadcaster()
-	router.Run("localhost:8080")
+	err := router.Run("localhost:8080")
+	if err != nil {
+		fmt.Println(err)
+	}
 }

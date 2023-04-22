@@ -5,17 +5,19 @@ import (
 )
 
 func SetRouters(router *gin.Engine) {
-	router.POST("/register", RegisterUser)
-	router.POST("/login", LoginUser)
-	router.POST("/loginBar", LoginBar)
-	router.POST("/registerBar", RegisterBar)
-	router.GET("/getUser", GetUser)
-	router.GET("/getAllProducts", GetAllProducts)
-	router.GET("/getAllFoods", GetAllFoods)
-	router.GET("/getTypes", GetTypes)
-	router.PUT("/changeUser", ChangeUser)
-	router.POST("/createProduct", CreateProduct)
-	router.GET("/getAllWorkedBars", GetAllWorkedBars)
-	router.POST("/orderFood", OrderFood)
-	router.GET("/wsChat", WsChat)
+	router.POST("api/user/register", RegisterUser)
+	router.POST("api/user/login", LoginUser)
+	router.GET("api/user/getUser", GetUser)
+	router.PUT("api/user/changeUser", ChangeUser)
+	router.POST("api/user/orderFood", OrderFood)
+	router.GET("api/user/getAllWorkedBars", GetAllWorkedBars)
+	router.GET("api/user/getTypes", GetTypes)
+	router.GET("api/user/getAllFoods", GetAllFoods)
+
+	router.POST("api/bar/loginBar", LoginBar)
+	router.GET("api/bar/getAllProducts", GetAllProducts)
+	router.GET("websocket/wsChat", WsChat)
+
+	router.POST("api/admin/createProduct", CreateProduct)
+	router.POST("api/admin/registerBar", RegisterBar)
 }

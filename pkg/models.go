@@ -60,6 +60,6 @@ func init() {
 
 	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, &Bar{}, &TypeProduct{})
 	if err != nil {
-		panic("Error automigrate: ")
+		panic("Error autoMigrate: ")
 	}
 }
