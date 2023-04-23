@@ -25,6 +25,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 func main() {
 	router := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
 	router.Use(CORSMiddleware())
 	internal.SetRouters(router)
 	go internal.Broadcaster()
