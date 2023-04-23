@@ -249,11 +249,20 @@ func ChangeUser(c *gin.Context) {
 		fmt.Println(err)
 	}
 
+	var admin string
+
+	if CheckAdmin(user) {
+		admin = "true"
+	} else {
+		admin = "false"
+	}
+
 	resp["Id"] = strconv.FormatUint(user.Id, 10)
 	resp["Username"] = user.Username
 	resp["Email"] = user.Email
 	resp["Phone"] = user.Phone
 	resp["Image"] = user.Image
+	resp["IsAdmin"] = admin
 
 	c.JSON(http.StatusOK, resp)
 }
