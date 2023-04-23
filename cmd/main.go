@@ -2,7 +2,7 @@ package main
 
 import (
 	"TwistAndWrapS/internal"
-	"fmt"
+	. "TwistAndWrapS/pkg/logging"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,6 +30,6 @@ func main() {
 	go internal.Broadcaster()
 	err := router.Run("localhost:8080")
 	if err != nil {
-		fmt.Println(err)
+		ErrorLogger.Println(err.Error())
 	}
 }

@@ -2,8 +2,8 @@ package internal
 
 import (
 	. "TwistAndWrapS/pkg"
+	. "TwistAndWrapS/pkg/logging"
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
@@ -44,10 +44,10 @@ func receiver(client *ClientBar) {
 
 			err = client.Conn.Close()
 			if err != nil {
-				fmt.Println(err)
+				ErrorLogger.Println(err.Error())
 				return
 			}
-			fmt.Println("err read message")
+			ErrorLogger.Println("Error read message: " + err.Error())
 			return
 		}
 
@@ -55,7 +55,7 @@ func receiver(client *ClientBar) {
 
 		err = json.Unmarshal(p, &m)
 		if err != nil {
-			fmt.Println(err)
+			ErrorLogger.Println(err.Error())
 			return
 		}
 
@@ -80,7 +80,7 @@ func Broadcaster() {
 					if err != nil {
 						return
 					}
-					fmt.Println("err write message")
+					ErrorLogger.Println("Error write message: " + err.Error())
 					return
 				}
 			}
@@ -97,14 +97,13 @@ func WsChat(c *gin.Context) {
 	roomId := c.Request.URL.Query().Get("roomId")
 
 	if roomId == "" {
-		fmt.Println("error get roomId")
 		c.Writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		fmt.Println(err)
+		ErrorLogger.Println(err.Error())
 		return
 	}
 

@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"fmt"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
@@ -19,14 +18,11 @@ func Login(w http.ResponseWriter, r *http.Request, userLogin *UserLogin) bool {
 	session, _ := store.Get(r, "session-name")
 
 	var user User
-	err := DB.First(&user, "Username = ?", userLogin.Username).Error
-
-	if err != nil {
-		fmt.Println("error db")
+	if err := DB.First(&user, "Username = ?", userLogin.Username).Error; err != nil {
 		return false
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userLogin.Password))
+	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userLogin.Password))
 	if err == nil {
 		session.Values["id"] = user.Id
 		session.Values["password"] = user.Password
@@ -64,14 +60,10 @@ func CheckSessionUser(r *http.Request) (bool, User) {
 	var user User
 
 	if session.IsNew {
-		fmt.Println("not sessions")
 		return false, user
 	}
 
-	err := DB.First(&user, "Id = ?", session.Values["id"]).Error
-
-	if err != nil {
-		fmt.Println("error db")
+	if err := DB.First(&user, "Id = ?", session.Values["id"]).Error; err != nil {
 		return false, user
 	}
 

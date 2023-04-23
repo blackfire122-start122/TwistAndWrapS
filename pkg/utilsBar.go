@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"fmt"
+	. "TwistAndWrapS/pkg/logging"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strconv"
@@ -17,14 +17,12 @@ func LoginB(w http.ResponseWriter, r *http.Request, barLogin *BarLogin) bool {
 	session, _ := store.Get(r, "session-name")
 
 	var bar Bar
-	err := DB.First(&bar, "id_bar = ?", barLogin.IdBar).Error
-
-	if err != nil {
-		fmt.Println("error db")
+	if err := DB.First(&bar, "id_bar = ?", barLogin.IdBar).Error; err != nil {
+		ErrorLogger.Println(err.Error())
 		return false
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(bar.Password), []byte(barLogin.Password))
+	err := bcrypt.CompareHashAndPassword([]byte(bar.Password), []byte(barLogin.Password))
 	if err == nil {
 		session.Values["idBar"] = bar.IdBar
 		session.Values["password"] = bar.Password
@@ -77,14 +75,11 @@ func CheckSessionBar(r *http.Request) (bool, Bar) {
 	var bar Bar
 
 	if session.IsNew {
-		fmt.Println("not sessions")
 		return false, bar
 	}
 
-	err := DB.First(&bar, "id_bar = ?", session.Values["idBar"]).Error
-
-	if err != nil {
-		fmt.Println("error db")
+	if err := DB.First(&bar, "id_bar = ?", session.Values["idBar"]).Error; err != nil {
+		ErrorLogger.Println(err.Error())
 		return false, bar
 	}
 

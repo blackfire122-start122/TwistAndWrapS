@@ -2,8 +2,8 @@ package internal
 
 import (
 	. "TwistAndWrapS/pkg"
+	. "TwistAndWrapS/pkg/logging"
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
 	"mime/multipart"
@@ -84,8 +84,6 @@ func LoginUser(c *gin.Context) {
 		resp["Login"] = "OK"
 		c.JSON(http.StatusOK, resp)
 	} else {
-		fmt.Println("error login")
-
 		resp["Login"] = "error login user"
 		c.JSON(http.StatusForbidden, resp)
 	}
@@ -102,7 +100,6 @@ func GetAllProducts(c *gin.Context) {
 	var products []Product
 
 	if err := DB.Find(&products).Error; err != nil {
-		fmt.Println("error get user")
 		c.Writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -186,8 +183,8 @@ func GetAllFoods(c *gin.Context) {
 	var products []Product
 
 	if err := DB.Preload("Type").Find(&products).Error; err != nil {
-		fmt.Println("error get products")
-		c.Writer.WriteHeader(http.StatusBadRequest)
+		ErrorLogger.Println("Error get products: " + err.Error())
+		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -224,7 +221,8 @@ func ChangeUser(c *gin.Context) {
 	resp := make(map[string]string)
 	var form FormChangeUser
 	if err := c.ShouldBind(&form); err != nil {
-		fmt.Println(err)
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	var ImageName string
@@ -233,20 +231,20 @@ func ChangeUser(c *gin.Context) {
 		ImageName = user.Image
 	} else {
 		if err := c.SaveUploadedFile(form.Image, "./media/UserImages/"+user.Username+form.Image.Filename); err != nil {
-			fmt.Println(err)
+			ErrorLogger.Println(err.Error())
 		}
 		if err := os.Remove("./" + user.Image); err != nil {
-			fmt.Println(err)
+			ErrorLogger.Println(err.Error())
 		}
 		ImageName = "media/UserImages/" + user.Username + form.Image.Filename
 	}
 
 	if err := DB.Save(&User{Id: user.Id, Username: form.Username, Image: ImageName, Email: form.Email, Phone: form.Phone, Password: user.Password}).Error; err != nil {
-		fmt.Println(err)
+		ErrorLogger.Println(err.Error())
 	}
 
 	if err := DB.First(&user, "id = ?", user.Id).Error; err != nil {
-		fmt.Println(err)
+		ErrorLogger.Println(err.Error())
 	}
 
 	var admin string
@@ -289,7 +287,7 @@ func CreateProduct(c *gin.Context) {
 
 	var form FormCreateProduct
 	if err := c.ShouldBind(&form); err != nil {
-		fmt.Println(err)
+		c.Writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -299,19 +297,20 @@ func CreateProduct(c *gin.Context) {
 		FileName = ""
 	} else {
 		if err := c.SaveUploadedFile(form.File, "./media/ProductImages/"+form.Name+form.Type+form.File.Filename); err != nil {
-			fmt.Println(err)
+			ErrorLogger.Println(err.Error())
 		}
 		FileName = "media/ProductImages/" + form.Name + form.Type + form.File.Filename
 	}
 
 	typeProductId, err := strconv.ParseUint(form.Type, 10, 64)
 	if err != nil {
-		fmt.Println(err)
+		c.Writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if err := DB.Create(&Product{Image: FileName, Name: form.Name, TypeId: typeProductId, Description: form.Description}).Error; err != nil {
-		fmt.Println(err)
+		ErrorLogger.Println(err.Error())
+		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -334,8 +333,8 @@ func GetTypes(c *gin.Context) {
 	var types []TypeProduct
 
 	if err := DB.Find(&types).Error; err != nil {
-		fmt.Println("error get types")
-		c.Writer.WriteHeader(http.StatusBadRequest)
+		ErrorLogger.Println(err.Error())
+		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -413,7 +412,6 @@ func OrderFood(c *gin.Context) {
 
 	var form Order
 	if err := c.ShouldBind(&form); err != nil {
-		fmt.Println(err)
 		c.Writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -423,7 +421,6 @@ func OrderFood(c *gin.Context) {
 		foodId, err := strconv.ParseUint(food.Id, 10, 64)
 
 		if err != nil {
-			fmt.Println(err)
 			c.Writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -431,7 +428,6 @@ func OrderFood(c *gin.Context) {
 		foodCount, err := strconv.ParseUint(food.Count, 10, 8)
 
 		if err != nil {
-			fmt.Println(err)
 			c.Writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
