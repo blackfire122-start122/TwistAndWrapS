@@ -39,11 +39,11 @@ func LoginB(w http.ResponseWriter, r *http.Request, barLogin *BarLogin) bool {
 }
 
 type BarRegister struct {
-	IdBar    string
-	Address  string
-	Password string
-	LngLatX  string
-	LngLatY  string
+	IdBar     string `json:"idBar"`
+	Address   string `json:"address"`
+	Password  string `json:"password"`
+	Longitude string `json:"longitude"`
+	Latitude  string `json:"latitude"`
 }
 
 func SignBar(bar *BarRegister) (string, error) {
@@ -53,19 +53,19 @@ func SignBar(bar *BarRegister) (string, error) {
 		return "", err
 	}
 
-	lngLatY, err := strconv.ParseFloat(bar.LngLatY, 10)
+	longitude, err := strconv.ParseFloat(bar.Longitude, 10)
 	if err != nil {
 		return "", err
 	}
 
-	lngLatX, err := strconv.ParseFloat(bar.LngLatX, 10)
+	latitude, err := strconv.ParseFloat(bar.Latitude, 10)
 	if err != nil {
 		return "", err
 	}
 
-	bar.IdBar = GenerateIdBar(lngLatY, lngLatX)
+	bar.IdBar = GenerateIdBar(longitude, latitude)
 
-	DB.Create(&Bar{IdBar: bar.IdBar, Password: string(hashedPassword), Address: bar.Address, LngLatY: lngLatY, LngLatX: lngLatX})
+	DB.Create(&Bar{IdBar: bar.IdBar, Password: string(hashedPassword), Address: bar.Address, Longitude: longitude, Latitude: latitude})
 	return bar.IdBar, err
 }
 

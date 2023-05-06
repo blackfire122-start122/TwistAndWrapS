@@ -30,12 +30,12 @@ func GetUser(c *gin.Context) {
 
 	resp := make(map[string]string)
 
-	resp["Id"] = strconv.FormatUint(user.Id, 10)
-	resp["Username"] = user.Username
-	resp["Email"] = user.Email
-	resp["Phone"] = user.Phone
-	resp["Image"] = user.Image
-	resp["IsAdmin"] = admin
+	resp["id"] = strconv.FormatUint(user.Id, 10)
+	resp["username"] = user.Username
+	resp["email"] = user.Email
+	resp["phone"] = user.Phone
+	resp["image"] = user.Image
+	resp["isAdmin"] = admin
 
 	c.JSON(http.StatusOK, resp)
 }
@@ -108,9 +108,9 @@ func GetAllProducts(c *gin.Context) {
 
 	for i, product := range products {
 		item := make(map[string]string)
-		item["Id"] = strconv.FormatUint(product.Id, 10)
-		item["Name"] = product.Name
-		item["Image"] = product.Image
+		item["id"] = strconv.FormatUint(product.Id, 10)
+		item["name"] = product.Name
+		item["image"] = product.Image
 		resp[i] = item
 	}
 
@@ -160,7 +160,7 @@ func RegisterBar(c *gin.Context) {
 		return
 	}
 
-	if bar.Password == "" || bar.LngLatX == "" || bar.LngLatY == "" || bar.Address == "" {
+	if bar.Password == "" || bar.Longitude == "" || bar.Latitude == "" || bar.Address == "" {
 		resp["Register"] = "Not all field"
 		c.JSON(http.StatusBadRequest, resp)
 		return
@@ -175,7 +175,7 @@ func RegisterBar(c *gin.Context) {
 	}
 
 	resp["Register"] = "OK"
-	resp["IdBar"] = idBar
+	resp["idBar"] = idBar
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -192,11 +192,11 @@ func GetAllFoods(c *gin.Context) {
 
 	for i, product := range products {
 		item := make(map[string]string)
-		item["Id"] = strconv.FormatUint(product.Id, 10)
-		item["Name"] = product.Name
-		item["Image"] = product.Image
-		item["Type"] = product.Type.Type
-		item["Description"] = product.Description
+		item["id"] = strconv.FormatUint(product.Id, 10)
+		item["name"] = product.Name
+		item["image"] = product.Image
+		item["type"] = product.Type.Type
+		item["description"] = product.Description
 		resp[i] = item
 	}
 
@@ -255,21 +255,21 @@ func ChangeUser(c *gin.Context) {
 		admin = "false"
 	}
 
-	resp["Id"] = strconv.FormatUint(user.Id, 10)
-	resp["Username"] = user.Username
-	resp["Email"] = user.Email
-	resp["Phone"] = user.Phone
-	resp["Image"] = user.Image
-	resp["IsAdmin"] = admin
+	resp["id"] = strconv.FormatUint(user.Id, 10)
+	resp["username"] = user.Username
+	resp["email"] = user.Email
+	resp["phone"] = user.Phone
+	resp["image"] = user.Image
+	resp["isAdmin"] = admin
 
 	c.JSON(http.StatusOK, resp)
 }
 
 type FormCreateProduct struct {
-	Type        string                `form:"Type" binding:"required"`
-	Name        string                `form:"Name" binding:"required"`
-	Description string                `form:"Description" binding:"required"`
-	File        *multipart.FileHeader `form:"File" binding:"required"`
+	Type        string                `form:"type" binding:"required"`
+	Name        string                `form:"name" binding:"required"`
+	Description string                `form:"description" binding:"required"`
+	File        *multipart.FileHeader `form:"file" binding:"required"`
 }
 
 func CreateProduct(c *gin.Context) {
@@ -342,8 +342,8 @@ func GetTypes(c *gin.Context) {
 
 	for i, typeItem := range types {
 		item := make(map[string]string)
-		item["Id"] = strconv.FormatUint(typeItem.Id, 10)
-		item["Type"] = typeItem.Type
+		item["id"] = strconv.FormatUint(typeItem.Id, 10)
+		item["type"] = typeItem.Type
 
 		resp[i] = item
 	}
@@ -369,11 +369,11 @@ func GetAllWorkedBars(c *gin.Context) {
 
 	for i, bar := range bars {
 		item := make(map[string]string)
-		item["Id"] = strconv.FormatUint(bar.Id, 10)
-		item["IdBar"] = bar.IdBar
-		item["Address"] = bar.Address
-		item["LngLatX"] = strconv.FormatFloat(bar.LngLatX, 'f', -1, 64)
-		item["LngLatY"] = strconv.FormatFloat(bar.LngLatY, 'f', -1, 64)
+		item["id"] = strconv.FormatUint(bar.Id, 10)
+		item["idBar"] = bar.IdBar
+		item["address"] = bar.Address
+		item["longitude"] = strconv.FormatFloat(bar.Longitude, 'f', -1, 64)
+		item["latitude"] = strconv.FormatFloat(bar.Latitude, 'f', -1, 64)
 
 		resp[i] = item
 	}
@@ -382,19 +382,19 @@ func GetAllWorkedBars(c *gin.Context) {
 }
 
 type Food struct {
-	Id    string `json:"Id"`
-	Count string `json:"Count"`
+	Id    string `json:"id"`
+	Count string `json:"count"`
 }
 
 type Order struct {
-	RestaurantId string `json:"RestaurantId"`
-	Foods        []Food `json:"Foods"`
-	Time         string `json:"Time"`
+	RestaurantId string `json:"restaurantId"`
+	Foods        []Food `json:"foods"`
+	Time         string `json:"time"`
 }
 
 type respCreate struct {
-	Type string
-	Msg  string
+	typeMsg string
+	msg     string
 }
 
 type MsgToBarCreateOrder struct {
@@ -458,7 +458,7 @@ func OrderFood(c *gin.Context) {
 			for {
 				m := <-BroadcastReceiver
 				if m.Client == cl {
-					c.JSON(http.StatusOK, respCreate{Type: m.Type, Msg: m.Msg})
+					c.JSON(http.StatusOK, respCreate{typeMsg: m.Type, msg: m.Msg})
 					break
 				}
 			}

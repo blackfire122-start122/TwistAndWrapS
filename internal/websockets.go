@@ -41,13 +41,13 @@ func receiver(client *ClientBar) {
 
 		if err != nil {
 			delete(Clients, client)
+			ErrorLogger.Println("Error read message: " + err.Error())
 
 			err = client.Conn.Close()
 			if err != nil {
 				ErrorLogger.Println(err.Error())
 				return
 			}
-			ErrorLogger.Println("Error read message: " + err.Error())
 			return
 		}
 
