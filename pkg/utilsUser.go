@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"errors"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
@@ -44,6 +45,22 @@ type UserRegister struct {
 }
 
 func Sign(user *UserRegister) error {
+	var users []User
+
+	if err := DB.Where("Username = ?", user.Username).Find(&users).Error; err != nil {
+		return err
+	}
+	if len(users) > 0 {
+		return errors.New("user with the same username already exists")
+	}
+
+	if err := DB.Where("Email = ?", user.Email).Find(&users).Error; err != nil {
+		return err
+	}
+	if len(users) > 0 {
+		return errors.New("user with the same email already exists")
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 
 	if err != nil {
