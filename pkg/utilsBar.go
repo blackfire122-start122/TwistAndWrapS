@@ -2,6 +2,7 @@ package pkg
 
 import (
 	. "TwistAndWrapS/pkg/logging"
+	"errors"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strconv"
@@ -47,10 +48,13 @@ type BarRegister struct {
 }
 
 func SignBar(bar *BarRegister) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(bar.Password), bcrypt.DefaultCost)
+	var bars []Bar
 
-	if err != nil {
+	if err := DB.Where("Address = ?", bar.Address).Find(&bars).Error; err != nil {
 		return "", err
+	}
+	if len(bars) > 0 {
+		return "", errors.New("bar with the same address already exists")
 	}
 
 	longitude, err := strconv.ParseFloat(bar.Longitude, 10)
@@ -59,6 +63,19 @@ func SignBar(bar *BarRegister) (string, error) {
 	}
 
 	latitude, err := strconv.ParseFloat(bar.Latitude, 10)
+	if err != nil {
+		return "", err
+	}
+
+	if err := DB.Where("Latitude = ? AND Longitude = ?", bar.Latitude, bar.Longitude).Find(&bars).Error; err != nil {
+		return "", err
+	}
+	if len(bars) > 0 {
+		return "", errors.New("bar with the same longitude and latitude already exists")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(bar.Password), bcrypt.DefaultCost)
+
 	if err != nil {
 		return "", err
 	}
