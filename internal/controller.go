@@ -552,3 +552,37 @@ func ChangeFood(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+func DeleteFood(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	id := c.Param("id")
+
+	var food Product
+
+	if err := DB.First(&food, "id = ?", id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := DB.Delete(&Product{}, id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := os.Remove("./" + food.Image); err != nil {
+		ErrorLogger.Println(err.Error())
+	}
+
+	c.Writer.WriteHeader(http.StatusOK)
+}
