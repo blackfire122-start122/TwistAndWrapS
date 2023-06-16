@@ -477,3 +477,78 @@ func OrderFood(c *gin.Context) {
 		}
 	}
 }
+
+type FormChangeFood struct {
+	Id          string                `form:"id" binding:"required"`
+	Type        string                `form:"type" binding:"required"`
+	Name        string                `form:"name" binding:"required"`
+	Description string                `form:"description" binding:"required"`
+	File        *multipart.FileHeader `form:"file" binding:"required"`
+}
+
+func ChangeFood(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	var form FormChangeFood
+	if err := c.ShouldBind(&form); err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var food Product
+
+	if err := DB.First(&food, "id = ?", form.Id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	var FileName string
+
+	if form.File.Filename == "" && form.File.Size == 0 {
+		FileName = food.Image
+	} else {
+		if err := c.SaveUploadedFile(form.File, "./media/ProductImages/"+form.Name+form.Type+form.File.Filename); err != nil {
+			ErrorLogger.Println(err.Error())
+		}
+		if err := os.Remove("./" + food.Image); err != nil {
+			ErrorLogger.Println(err.Error())
+		}
+		FileName = "media/ProductImages/" + form.Name + form.Type + form.File.Filename
+	}
+
+	typeProductId, err := strconv.ParseUint(form.Type, 10, 64)
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := DB.Save(&Product{Id: food.Id, Image: FileName, Name: form.Name, TypeId: typeProductId, Description: form.Description}).Error; err != nil {
+		ErrorLogger.Println(err.Error())
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := DB.Preload("Type").First(&food, "id = ?", food.Id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp := make(map[string]string)
+	resp["id"] = strconv.FormatUint(food.Id, 10)
+	resp["image"] = food.Image
+	resp["name"] = food.Name
+	resp["description"] = food.Description
+	resp["type"] = food.Type.Type
+
+	c.JSON(http.StatusOK, resp)
+}
