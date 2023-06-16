@@ -7,6 +7,7 @@ import (
 func SetRouters(router *gin.Engine) {
 	router.POST("api/user/register", RegisterUser)
 	router.POST("api/user/login", LoginUser)
+	router.GET("api/user/logout", LogoutUser)
 	router.GET("api/user/getUser", GetUser)
 	router.PUT("api/user/changeUser", ChangeUser)
 	router.POST("api/user/orderFood", OrderFood)

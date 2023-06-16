@@ -89,6 +89,18 @@ func LoginUser(c *gin.Context) {
 	}
 }
 
+func LogoutUser(c *gin.Context) {
+	resp := make(map[string]string)
+
+	if Logout(c.Writer, c.Request) {
+		resp["Logout"] = "OK"
+		c.JSON(http.StatusOK, resp)
+	} else {
+		resp["Logout"] = "error logout user"
+		c.JSON(http.StatusInternalServerError, resp)
+	}
+}
+
 func GetAllProducts(c *gin.Context) {
 	loginBar, _ := CheckSessionBar(c.Request)
 

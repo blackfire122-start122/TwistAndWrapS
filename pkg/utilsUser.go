@@ -98,3 +98,18 @@ func CheckAdmin(user User) bool {
 
 	return admin.UserId == user.Id
 }
+
+func Logout(w http.ResponseWriter, r *http.Request) bool {
+	session, _ := store.Get(r, "session-name")
+
+	session.Values["id"] = nil
+	session.Values["password"] = nil
+
+	session.Options.MaxAge = -1
+
+	err := session.Save(r, w)
+	if err != nil {
+		return false
+	}
+	return true
+}
