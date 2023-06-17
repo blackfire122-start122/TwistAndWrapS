@@ -586,3 +586,39 @@ func DeleteFood(c *gin.Context) {
 
 	c.Writer.WriteHeader(http.StatusOK)
 }
+
+func GetAllBars(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	var bars []Bar
+
+	if err := DB.Find(&bars).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+	}
+
+	resp := make([]map[string]string, len(bars))
+
+	for i, bar := range bars {
+		item := make(map[string]string)
+		item["id"] = strconv.FormatUint(bar.Id, 10)
+		item["idBar"] = bar.IdBar
+		item["address"] = bar.Address
+		item["longitude"] = strconv.FormatFloat(bar.Longitude, 'f', -1, 64)
+		item["latitude"] = strconv.FormatFloat(bar.Latitude, 'f', -1, 64)
+
+		resp[i] = item
+	}
+
+	c.JSON(http.StatusOK, resp)
+
+}
