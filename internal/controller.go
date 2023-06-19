@@ -693,3 +693,33 @@ func ChangeBar(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+func DeleteBar(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	id := c.Param("id")
+
+	var bar Bar
+
+	if err := DB.First(&bar, "id = ?", id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := DB.Delete(&Bar{}, id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	c.Writer.WriteHeader(http.StatusOK)
+}
