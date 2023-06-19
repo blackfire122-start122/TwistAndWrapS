@@ -23,6 +23,7 @@ func SetRouters(router *gin.Engine) {
 	router.POST("api/admin/createProduct", CreateProduct)
 	router.POST("api/admin/registerBar", RegisterBar)
 	router.POST("api/admin/changeFood", ChangeFood)
+	router.POST("api/admin/changeBar", ChangeBar)
 	router.DELETE("api/admin/deleteFood/:id", DeleteFood)
 
 }

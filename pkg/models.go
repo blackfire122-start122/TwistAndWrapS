@@ -44,7 +44,7 @@ type Bar struct {
 	gorm.Model
 	Id        uint64 `gorm:"primaryKey"`
 	Address   string
-	IdBar     string
+	IdBar     string `gorm:"unique"`
 	Password  string
 	Longitude float64
 	Latitude  float64

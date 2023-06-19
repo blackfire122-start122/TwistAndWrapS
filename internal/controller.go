@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func GetUser(c *gin.Context) {
@@ -620,5 +621,75 @@ func GetAllBars(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
 
+type FormChangeBar struct {
+	Id        string `form:"id" binding:"required"`
+	IdBar     string `form:"idBar" binding:"required"`
+	Address   string `form:"address" binding:"required"`
+	Longitude string `form:"longitude" binding:"required"`
+	Latitude  string `form:"latitude" binding:"required"`
+}
+
+func ChangeBar(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if !CheckAdmin(user) {
+		c.Writer.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	var form FormChangeBar
+	if err := c.ShouldBind(&form); err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var bar Bar
+
+	if err := DB.First(&bar, "id = ?", form.Id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	longitude, err := strconv.ParseFloat(form.Longitude, 10)
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	latitude, err := strconv.ParseFloat(form.Latitude, 10)
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := DB.Save(&Bar{Id: bar.Id, IdBar: form.IdBar, Address: form.Address, Longitude: longitude, Latitude: latitude}).Error; err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: bars.id_bar") {
+			c.Writer.WriteHeader(http.StatusConflict)
+			return
+		}
+		ErrorLogger.Println(err.Error())
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := DB.First(&bar, "id = ?", bar.Id).Error; err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp := make(map[string]string)
+	resp["id"] = strconv.FormatUint(bar.Id, 10)
+	resp["address"] = bar.Address
+	resp["idBar"] = bar.IdBar
+	resp["latitude"] = strconv.FormatFloat(bar.Latitude, 'f', -1, 64)
+	resp["longitude"] = strconv.FormatFloat(bar.Longitude, 'f', -1, 64)
+
+	c.JSON(http.StatusOK, resp)
 }
