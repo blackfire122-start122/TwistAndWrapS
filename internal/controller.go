@@ -405,14 +405,16 @@ type Order struct {
 	Time         string `json:"time"`
 }
 
-type respCreate struct {
-	typeMsg string
-	msg     string
-}
-
 type MsgToBarCreateOrder struct {
 	FoodIdCount map[uint64]uint8
 	Time        string
+}
+
+type RespMsg struct {
+	Type            string
+	Id              uint64
+	ProductsCreated []uint64
+	Msg             string
 }
 
 func OrderFood(c *gin.Context) {
@@ -471,7 +473,7 @@ func OrderFood(c *gin.Context) {
 			for {
 				m := <-BroadcastReceiver
 				if m.Client == cl {
-					c.JSON(http.StatusOK, respCreate{typeMsg: m.Type, msg: m.Msg})
+					c.JSON(http.StatusOK, RespMsg{Type: m.Type, Msg: m.Msg, ProductsCreated: m.ProductsCreated, Id: m.Id})
 					break
 				}
 			}

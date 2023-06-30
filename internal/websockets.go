@@ -4,9 +4,11 @@ import (
 	. "TwistAndWrapS/pkg"
 	. "TwistAndWrapS/pkg/logging"
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"net/http"
+	"time"
 )
 
 var upgrader = websocket.Upgrader{
@@ -31,37 +33,44 @@ type MessageChat struct {
 	Msg  string
 }
 
+type RespMessage struct {
+	Type            string
+	Id              uint64
+	ProductsCreated []uint64
+	Msg             string
+	Client          *ClientBar
+}
+
 var Clients = make(map[*ClientBar]bool)
 var Broadcast = make(chan *Message)
-var BroadcastReceiver = make(chan *Message)
+var BroadcastReceiver = make(chan *RespMessage)
 
 func receiver(client *ClientBar) {
+	defer func() {
+		if err := client.Conn.Close(); err != nil {
+			ErrorLogger.Println(err.Error())
+		}
+	}()
+
 	for {
 		_, p, err := client.Conn.ReadMessage()
-
 		if err != nil {
 			delete(Clients, client)
 			ErrorLogger.Println("Error read message: " + err.Error())
-
-			err = client.Conn.Close()
-			if err != nil {
-				ErrorLogger.Println(err.Error())
-				return
-			}
-			return
+			break
 		}
 
-		var m Message
+		var m RespMessage
 
 		err = json.Unmarshal(p, &m)
 		if err != nil {
 			ErrorLogger.Println(err.Error())
-			return
+			break
 		}
 
 		m.Client = client
 
-		if m.Type == "createOrder" {
+		if m.Type == "OrderCreated" {
 			BroadcastReceiver <- &m
 		}
 	}
@@ -75,12 +84,15 @@ func Broadcaster() {
 				err := client.Conn.WriteJSON(MessageChat{Type: message.Type, Msg: message.Msg})
 
 				if err != nil {
+
+					fmt.Println("err write message ", err)
+
+					ErrorLogger.Println("Error write message: " + err.Error())
 					delete(Clients, client)
 					err := client.Conn.Close()
 					if err != nil {
-						return
+						ErrorLogger.Println("Error close message: " + err.Error())
 					}
-					ErrorLogger.Println("Error write message: " + err.Error())
 					return
 				}
 			}
@@ -111,4 +123,24 @@ func WsChat(c *gin.Context) {
 	Clients[&client] = true
 
 	go receiver(&client)
+	go pingPong(&client)
+}
+
+func pingPong(client *ClientBar) {
+	ticker := time.NewTicker(30 * time.Second)
+
+	defer func() {
+		ticker.Stop()
+		err := client.Conn.Close()
+		if err != nil {
+			ErrorLogger.Println("Error close", err)
+		}
+	}()
+
+	for range ticker.C {
+		if err := client.Conn.WriteControl(websocket.PingMessage, []byte("ping"), time.Now().Add(5*time.Second)); err != nil {
+			ErrorLogger.Println("Error sending ping message: " + err.Error())
+			break
+		}
+	}
 }
