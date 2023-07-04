@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func GetUser(c *gin.Context) {
@@ -399,7 +400,7 @@ type Food struct {
 	Count string `json:"count"`
 }
 
-type Order struct {
+type OrderForm struct {
 	RestaurantId string `json:"restaurantId"`
 	Foods        []Food `json:"foods"`
 	Time         string `json:"time"`
@@ -418,20 +419,22 @@ type RespMsg struct {
 }
 
 func OrderFood(c *gin.Context) {
-	loginUser, _ := CheckSessionUser(c.Request)
+	loginUser, user := CheckSessionUser(c.Request)
 
 	if !loginUser {
 		c.Writer.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	var form Order
+	var form OrderForm
 	if err := c.ShouldBind(&form); err != nil {
 		c.Writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	foodIdCount := make(map[uint64]uint8)
+	var foodIds []uint64
+
 	for _, food := range form.Foods {
 		foodId, err := strconv.ParseUint(food.Id, 10, 64)
 
@@ -439,6 +442,8 @@ func OrderFood(c *gin.Context) {
 			c.Writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
+		foodIds = append(foodIds, foodId)
 
 		foodCount, err := strconv.ParseUint(food.Count, 10, 8)
 
@@ -473,12 +478,59 @@ func OrderFood(c *gin.Context) {
 			for {
 				m := <-BroadcastReceiver
 				if m.Client == cl {
+					orderTime, err := time.Parse("15:04", form.Time)
+					if err != nil {
+						c.Writer.WriteHeader(http.StatusBadRequest)
+						return
+					}
+
+					var orderProducts []OrderProduct
+					var products []Product
+					DB.Find(&products, "id IN ?", foodIds)
+
+					for _, product := range products {
+						var status string
+						if contains(m.ProductsCreated, product.Id) {
+							status = "created"
+						} else {
+							status = "not created"
+						}
+
+						orderProduct := OrderProduct{
+							Product: product,
+							Count:   foodIdCount[product.Id],
+							Status:  status,
+						}
+						orderProducts = append(orderProducts, orderProduct)
+					}
+
+					order := Order{
+						User:          user,
+						Bar:           bar,
+						OrderProducts: orderProducts,
+						OrderTime:     orderTime,
+						OrderId:       m.Id,
+					}
+
+					if err := DB.Create(&order).Error; err != nil {
+						c.Writer.WriteHeader(http.StatusInternalServerError)
+						return
+					}
 					c.JSON(http.StatusOK, RespMsg{Type: m.Type, Msg: m.Msg, ProductsCreated: m.ProductsCreated, Id: m.Id})
-					break
+					return
 				}
 			}
 		}
 	}
+}
+
+func contains(slice []uint64, item uint64) bool {
+	for _, value := range slice {
+		if value == item {
+			return true
+		}
+	}
+	return false
 }
 
 type FormChangeFood struct {
@@ -724,4 +776,69 @@ func DeleteBar(c *gin.Context) {
 	}
 
 	c.Writer.WriteHeader(http.StatusOK)
+}
+
+type respGetOrdersProduct struct {
+	Description string
+	Id          uint64
+	Image       string
+	Name        string
+	Type        string
+}
+
+type respGetOrdersOrderProducts struct {
+	Count   uint8
+	ID      uint
+	OrderID uint64
+	Product respGetOrdersProduct
+	Status  string
+}
+
+type respGetOrders struct {
+	BarID         uint64
+	Id            uint64
+	OrderId       uint64
+	OrderProducts []respGetOrdersOrderProducts
+	OrderTime     string
+}
+
+func GetOrders(c *gin.Context) {
+	loginUser, user := CheckSessionUser(c.Request)
+
+	if !loginUser {
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	DB.Preload("Orders").Preload("Orders.OrderProducts.Product.Type").First(&user, "id = ?", user.Id)
+	var resp []respGetOrders
+
+	for _, order := range user.Orders {
+		var orderProducts []respGetOrdersOrderProducts
+		for _, orderProduct := range order.OrderProducts {
+			orderProducts = append(orderProducts, respGetOrdersOrderProducts{
+				Count:   orderProduct.Count,
+				ID:      orderProduct.ID,
+				OrderID: orderProduct.OrderID,
+				Product: respGetOrdersProduct{
+					Description: orderProduct.Product.Description,
+					Id:          orderProduct.Product.Id,
+					Image:       orderProduct.Product.Image,
+					Name:        orderProduct.Product.Name,
+					Type:        orderProduct.Product.Type.Type,
+				},
+				Status: orderProduct.Status,
+			})
+		}
+
+		resp = append(resp, respGetOrders{
+			BarID:         order.BarID,
+			Id:            order.Id,
+			OrderId:       order.OrderId,
+			OrderProducts: orderProducts,
+			OrderTime:     order.OrderTime.Format("15:04"),
+		})
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

@@ -15,6 +15,7 @@ func SetRouters(router *gin.Engine) {
 	router.GET("api/user/getAllBars", GetAllBars)
 	router.GET("api/user/getTypes", GetTypes)
 	router.GET("api/user/getAllFoods", GetAllFoods)
+	router.GET("api/user/getOrders", GetOrders)
 
 	router.POST("api/bar/loginBar", LoginBar)
 	router.GET("api/bar/getAllProducts", GetAllProducts)

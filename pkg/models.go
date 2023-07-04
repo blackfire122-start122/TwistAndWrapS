@@ -3,6 +3,7 @@ package pkg
 import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"time"
 )
 
 var DB *gorm.DB
@@ -15,6 +16,29 @@ type User struct {
 	Email    string
 	Phone    string
 	Image    string
+	Orders   []Order
+}
+
+type Order struct {
+	gorm.Model
+	Id            uint64 `gorm:"primaryKey"`
+	UserID        uint64
+	User          User `gorm:"foreignKey:UserID"`
+	OrderProducts []OrderProduct
+	BarID         uint64
+	Bar           Bar `gorm:"foreignKey:BarID"`
+	OrderTime     time.Time
+	OrderId       uint64
+}
+
+type OrderProduct struct {
+	gorm.Model
+	OrderID   uint64
+	Order     Order `gorm:"foreignKey:OrderID"`
+	ProductID uint64
+	Product   Product `gorm:"foreignKey:ProductID"`
+	Count     uint8
+	Status    string
 }
 
 type Admin struct {
@@ -58,7 +82,7 @@ func init() {
 		panic("failed to connect database")
 	}
 
-	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, &Bar{}, &TypeProduct{})
+	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, &Bar{}, &TypeProduct{}, Order{}, &OrderProduct{})
 	if err != nil {
 		panic("Error autoMigrate: ")
 	}

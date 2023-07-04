@@ -72,6 +72,19 @@ func receiver(client *ClientBar) {
 
 		if m.Type == "OrderCreated" {
 			BroadcastReceiver <- &m
+		} else if m.Type == "OrderGive" {
+			var order Order
+			if err := DB.Preload("OrderProducts").First(&order, "order_id=?", m.Id).Error; err != nil {
+				ErrorLogger.Println("Error not found order ", err)
+			}
+			for _, orderProduct := range order.OrderProducts {
+				if err := DB.Unscoped().Delete(&orderProduct).Error; err != nil {
+					ErrorLogger.Println("Error deleting order product: ", err)
+				}
+			}
+			if err := DB.Unscoped().Delete(&order).Error; err != nil {
+				ErrorLogger.Println("Error delete order ", err)
+			}
 		}
 	}
 }
