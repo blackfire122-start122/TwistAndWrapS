@@ -411,13 +411,6 @@ type MsgToBarCreateOrder struct {
 	Time        string
 }
 
-type RespMsg struct {
-	Type            string
-	Id              uint64
-	ProductsCreated []uint64
-	Msg             string
-}
-
 func OrderFood(c *gin.Context) {
 	loginUser, user := CheckSessionUser(c.Request)
 
@@ -516,7 +509,25 @@ func OrderFood(c *gin.Context) {
 						c.Writer.WriteHeader(http.StatusInternalServerError)
 						return
 					}
-					c.JSON(http.StatusOK, RespMsg{Type: m.Type, Msg: m.Msg, ProductsCreated: m.ProductsCreated, Id: m.Id})
+
+					var orderProductsResp []respOrderOrderProducts
+					for _, orderProduct := range order.OrderProducts {
+						orderProductsResp = append(orderProductsResp, respOrderOrderProducts{
+							Count:   orderProduct.Count,
+							ID:      orderProduct.ID,
+							OrderID: orderProduct.OrderID,
+							Product: respOrderProduct{
+								Description: orderProduct.Product.Description,
+								Id:          orderProduct.Product.Id,
+								Image:       orderProduct.Product.Image,
+								Name:        orderProduct.Product.Name,
+								Type:        orderProduct.Product.Type.Type,
+							},
+							Status: orderProduct.Status,
+						})
+					}
+
+					c.JSON(http.StatusOK, respOrder{Id: order.Id, OrderId: order.OrderId, OrderProducts: orderProductsResp, OrderTime: order.OrderTime.Format("15:04")})
 					return
 				}
 			}
@@ -778,7 +789,7 @@ func DeleteBar(c *gin.Context) {
 	c.Writer.WriteHeader(http.StatusOK)
 }
 
-type respGetOrdersProduct struct {
+type respOrderProduct struct {
 	Description string
 	Id          uint64
 	Image       string
@@ -786,19 +797,18 @@ type respGetOrdersProduct struct {
 	Type        string
 }
 
-type respGetOrdersOrderProducts struct {
+type respOrderOrderProducts struct {
 	Count   uint8
 	ID      uint
 	OrderID uint64
-	Product respGetOrdersProduct
+	Product respOrderProduct
 	Status  string
 }
 
-type respGetOrders struct {
-	BarID         uint64
+type respOrder struct {
 	Id            uint64
 	OrderId       uint64
-	OrderProducts []respGetOrdersOrderProducts
+	OrderProducts []respOrderOrderProducts
 	OrderTime     string
 }
 
@@ -811,16 +821,16 @@ func GetOrders(c *gin.Context) {
 	}
 
 	DB.Preload("Orders").Preload("Orders.OrderProducts.Product.Type").First(&user, "id = ?", user.Id)
-	var resp []respGetOrders
+	var resp []respOrder
 
 	for _, order := range user.Orders {
-		var orderProducts []respGetOrdersOrderProducts
+		var orderProducts []respOrderOrderProducts
 		for _, orderProduct := range order.OrderProducts {
-			orderProducts = append(orderProducts, respGetOrdersOrderProducts{
+			orderProducts = append(orderProducts, respOrderOrderProducts{
 				Count:   orderProduct.Count,
 				ID:      orderProduct.ID,
 				OrderID: orderProduct.OrderID,
-				Product: respGetOrdersProduct{
+				Product: respOrderProduct{
 					Description: orderProduct.Product.Description,
 					Id:          orderProduct.Product.Id,
 					Image:       orderProduct.Product.Image,
@@ -831,8 +841,7 @@ func GetOrders(c *gin.Context) {
 			})
 		}
 
-		resp = append(resp, respGetOrders{
-			BarID:         order.BarID,
+		resp = append(resp, respOrder{
 			Id:            order.Id,
 			OrderId:       order.OrderId,
 			OrderProducts: orderProducts,
