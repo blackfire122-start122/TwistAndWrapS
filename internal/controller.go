@@ -459,7 +459,7 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
-	msg, err := json.Marshal(MsgToBarCreateOrder{FoodIdCount: foodIdCount, Time: form.Time})
+	data, err := json.Marshal(MsgToBarCreateOrder{FoodIdCount: foodIdCount, Time: form.Time})
 	if err != nil {
 		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -467,9 +467,9 @@ func OrderFood(c *gin.Context) {
 
 	for cl, _ := range Clients {
 		if cl.Bar.IdBar == bar.IdBar {
-			Broadcast <- &Message{Type: "createOrder", Msg: string(msg), Client: cl}
+			Broadcast <- &ClientMessage{Message: &Message{Type: "createOrder", Data: data}, Client: cl}
 			for {
-				m := <-BroadcastReceiver
+				m := <-BroadcastCreateOrder
 				if m.Client == cl {
 					orderTime, err := time.Parse("15:04", form.Time)
 					if err != nil {
@@ -810,6 +810,7 @@ type respOrder struct {
 	OrderId       uint64
 	OrderProducts []respOrderOrderProducts
 	OrderTime     string
+	BarAddress    string
 }
 
 func GetOrders(c *gin.Context) {
@@ -820,7 +821,7 @@ func GetOrders(c *gin.Context) {
 		return
 	}
 
-	DB.Preload("Orders").Preload("Orders.OrderProducts.Product.Type").First(&user, "id = ?", user.Id)
+	DB.Preload("Orders").Preload("Orders.OrderProducts.Product.Type").Preload("Orders.Bar").First(&user, "id = ?", user.Id)
 	var resp []respOrder
 
 	for _, order := range user.Orders {
@@ -846,6 +847,7 @@ func GetOrders(c *gin.Context) {
 			OrderId:       order.OrderId,
 			OrderProducts: orderProducts,
 			OrderTime:     order.OrderTime.Format("15:04"),
+			BarAddress:    order.Bar.Address,
 		})
 	}
 

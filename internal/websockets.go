@@ -23,27 +23,28 @@ type ClientBar struct {
 }
 
 type Message struct {
-	Type   string     `json:"Type"`
-	Msg    string     `json:"Msg"`
-	Client *ClientBar `json:"Client,omitempty"`
+	Type string          `json:"Type"`
+	Data json.RawMessage `json:"Data"`
 }
 
-type MessageChat struct {
-	Type string
-	Msg  string
+type ClientMessage struct {
+	Client  *ClientBar
+	Message *Message
 }
 
-type RespMessage struct {
-	Type            string
-	Id              uint64
-	ProductsCreated []uint64
-	Msg             string
-	Client          *ClientBar
+type CreateOrderMessage struct {
+	Client          *ClientBar `json:"Client,omitempty"`
+	ProductsCreated []uint64   `json:"ProductsCreated"`
+	Id              uint64     `json:"Id"`
+}
+
+type OrderGiveMessage struct {
+	Id uint64 `json:"Id"`
 }
 
 var Clients = make(map[*ClientBar]bool)
-var Broadcast = make(chan *Message)
-var BroadcastReceiver = make(chan *RespMessage)
+var Broadcast = make(chan *ClientMessage)
+var BroadcastCreateOrder = make(chan *CreateOrderMessage)
 
 func receiver(client *ClientBar) {
 	defer func() {
@@ -60,7 +61,7 @@ func receiver(client *ClientBar) {
 			break
 		}
 
-		var m RespMessage
+		var m Message
 
 		err = json.Unmarshal(p, &m)
 		if err != nil {
@@ -68,13 +69,25 @@ func receiver(client *ClientBar) {
 			break
 		}
 
-		m.Client = client
-
 		if m.Type == "OrderCreated" {
-			BroadcastReceiver <- &m
+			var msg CreateOrderMessage
+			err := json.Unmarshal(m.Data, &msg)
+			if err != nil {
+				ErrorLogger.Println("Error unmarshal create order msg: ", err)
+				return
+			}
+			msg.Client = client
+			BroadcastCreateOrder <- &msg
 		} else if m.Type == "OrderGive" {
+			var msg OrderGiveMessage
+			err := json.Unmarshal(m.Data, &msg)
+			if err != nil {
+				ErrorLogger.Println("Error unmarshal create order msg: ", err)
+				return
+			}
+
 			var order Order
-			if err := DB.Preload("OrderProducts").First(&order, "order_id=?", m.Id).Error; err != nil {
+			if err := DB.Preload("OrderProducts").First(&order, "order_id=?", msg.Id).Error; err != nil {
 				ErrorLogger.Println("Error not found order ", err)
 			}
 			for _, orderProduct := range order.OrderProducts {
@@ -91,10 +104,10 @@ func receiver(client *ClientBar) {
 
 func Broadcaster() {
 	for {
-		message := <-Broadcast
+		msgCl := <-Broadcast
 		for client := range Clients {
-			if client.RoomId == message.Client.RoomId {
-				err := client.Conn.WriteJSON(MessageChat{Type: message.Type, Msg: message.Msg})
+			if client.RoomId == msgCl.Client.RoomId {
+				err := client.Conn.WriteJSON(Message{Type: msgCl.Message.Type, Data: msgCl.Message.Data})
 
 				if err != nil {
 
