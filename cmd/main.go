@@ -27,6 +27,7 @@ func main() {
 	router.Use(CORSMiddleware())
 	internal.SetRouters(router)
 	go internal.Broadcaster()
+	go internal.RedisReceiver()
 	err := router.Run("localhost:8080")
 	if err != nil {
 		ErrorLogger.Println(err.Error())

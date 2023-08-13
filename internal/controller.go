@@ -373,21 +373,19 @@ func GetAllWorkedBars(c *gin.Context) {
 		return
 	}
 
-	var bars []Bar
+	var clients []ClientBarDB
 
-	for bar, _ := range Clients {
-		bars = append(bars, bar.Bar)
-	}
+	DB.Preload("Bar").Find(&clients)
 
-	resp := make([]map[string]string, len(bars))
+	resp := make([]map[string]string, len(clients))
 
-	for i, bar := range bars {
+	for i, cl := range clients {
 		item := make(map[string]string)
-		item["id"] = strconv.FormatUint(bar.Id, 10)
-		item["idBar"] = bar.IdBar
-		item["address"] = bar.Address
-		item["longitude"] = strconv.FormatFloat(bar.Longitude, 'f', -1, 64)
-		item["latitude"] = strconv.FormatFloat(bar.Latitude, 'f', -1, 64)
+		item["id"] = strconv.FormatUint(cl.Bar.Id, 10)
+		item["idBar"] = cl.Bar.IdBar
+		item["address"] = cl.Bar.Address
+		item["longitude"] = strconv.FormatFloat(cl.Bar.Longitude, 'f', -1, 64)
+		item["latitude"] = strconv.FormatFloat(cl.Bar.Latitude, 'f', -1, 64)
 
 		resp[i] = item
 	}
@@ -459,78 +457,92 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
+	var client ClientBarDB
+
+	if err := DB.Preload("Bar").First(&client, "bar_id=?", bar.Id).Error; err != nil {
+		ErrorLogger.Println("Error find client:", err.Error())
+	}
+
 	data, err := json.Marshal(MsgToBarCreateOrder{FoodIdCount: foodIdCount, Time: form.Time})
 	if err != nil {
 		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	for cl, _ := range Clients {
-		if cl.Bar.IdBar == bar.IdBar {
-			Broadcast <- &ClientMessage{Message: &Message{Type: "createOrder", Data: data}, Client: cl}
-			for {
-				m := <-BroadcastCreateOrder
-				if m.Client == cl {
-					orderTime, err := time.Parse("15:04", form.Time)
-					if err != nil {
-						c.Writer.WriteHeader(http.StatusBadRequest)
-						return
-					}
+	msg := &Message{Type: "createOrder", Data: data, RoomId: client.RoomId}
 
-					var orderProducts []OrderProduct
-					var products []Product
-					DB.Find(&products, "id IN ?", foodIds)
+	m, err := json.Marshal(msg)
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-					for _, product := range products {
-						var status string
-						if contains(m.ProductsCreated, product.Id) {
-							status = "created"
-						} else {
-							status = "not created"
-						}
+	if err := ClientRedis.Publish(Ctx, WebsocketChannel, string(m)).Err(); err != nil {
+		ErrorLogger.Println("Error publishing message:", err.Error())
+	}
 
-						orderProduct := OrderProduct{
-							Product: product,
-							Count:   foodIdCount[product.Id],
-							Status:  status,
-						}
-						orderProducts = append(orderProducts, orderProduct)
-					}
-
-					order := Order{
-						User:          user,
-						Bar:           bar,
-						OrderProducts: orderProducts,
-						OrderTime:     orderTime,
-						OrderId:       m.Id,
-					}
-
-					if err := DB.Create(&order).Error; err != nil {
-						c.Writer.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-
-					var orderProductsResp []respOrderOrderProducts
-					for _, orderProduct := range order.OrderProducts {
-						orderProductsResp = append(orderProductsResp, respOrderOrderProducts{
-							Count:   orderProduct.Count,
-							ID:      orderProduct.ID,
-							OrderID: orderProduct.OrderID,
-							Product: respOrderProduct{
-								Description: orderProduct.Product.Description,
-								Id:          orderProduct.Product.Id,
-								Image:       orderProduct.Product.Image,
-								Name:        orderProduct.Product.Name,
-								Type:        orderProduct.Product.Type.Type,
-							},
-							Status: orderProduct.Status,
-						})
-					}
-
-					c.JSON(http.StatusOK, respOrder{Id: order.Id, OrderId: order.OrderId, OrderProducts: orderProductsResp, OrderTime: order.OrderTime.Format("15:04")})
-					return
-				}
+	Broadcast <- msg
+	for {
+		m := <-BroadcastCreateOrder
+		if m.Client.RoomId == client.RoomId {
+			orderTime, err := time.Parse("15:04", form.Time)
+			if err != nil {
+				c.Writer.WriteHeader(http.StatusBadRequest)
+				return
 			}
+
+			var orderProducts []OrderProduct
+			var products []Product
+			DB.Find(&products, "id IN ?", foodIds)
+
+			for _, product := range products {
+				var status string
+				if contains(m.ProductsCreated, product.Id) {
+					status = "created"
+				} else {
+					status = "not created"
+				}
+
+				orderProduct := OrderProduct{
+					Product: product,
+					Count:   foodIdCount[product.Id],
+					Status:  status,
+				}
+				orderProducts = append(orderProducts, orderProduct)
+			}
+
+			order := Order{
+				User:          user,
+				Bar:           bar,
+				OrderProducts: orderProducts,
+				OrderTime:     orderTime,
+				OrderId:       m.Id,
+			}
+
+			if err := DB.Create(&order).Error; err != nil {
+				c.Writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			var orderProductsResp []respOrderOrderProducts
+			for _, orderProduct := range order.OrderProducts {
+				orderProductsResp = append(orderProductsResp, respOrderOrderProducts{
+					Count:   orderProduct.Count,
+					ID:      orderProduct.ID,
+					OrderID: orderProduct.OrderID,
+					Product: respOrderProduct{
+						Description: orderProduct.Product.Description,
+						Id:          orderProduct.Product.Id,
+						Image:       orderProduct.Product.Image,
+						Name:        orderProduct.Product.Name,
+						Type:        orderProduct.Product.Type.Type,
+					},
+					Status: orderProduct.Status,
+				})
+			}
+
+			c.JSON(http.StatusOK, respOrder{Id: order.Id, OrderId: order.OrderId, OrderProducts: orderProductsResp, OrderTime: order.OrderTime.Format("15:04")})
+			return
 		}
 	}
 }
