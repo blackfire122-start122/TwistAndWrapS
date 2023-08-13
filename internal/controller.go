@@ -477,11 +477,8 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
-	if err := ClientRedis.Publish(Ctx, WebsocketChannel, string(m)).Err(); err != nil {
-		ErrorLogger.Println("Error publishing message:", err.Error())
-	}
+	sendInRedisWebsocketChannel(string(m))
 
-	Broadcast <- msg
 	for {
 		m := <-BroadcastCreateOrder
 		if m.Client.RoomId == client.RoomId {

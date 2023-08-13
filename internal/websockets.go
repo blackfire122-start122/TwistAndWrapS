@@ -49,6 +49,16 @@ func deleteClient(client *ClientBar) {
 	}
 }
 
+func sendInRedisWebsocketChannel(msg interface{}) {
+	if err := ClientRedis.Publish(Ctx, WebsocketChannel, msg); err != nil {
+		if err.Val() == 0 {
+			_ = ReconnectToRedis()
+		} else {
+			ErrorLogger.Println("Error publishing message:", err)
+		}
+	}
+}
+
 func receiver(client *ClientBar) {
 	defer func() {
 		if err := client.Conn.Close(); err != nil {
@@ -78,18 +88,17 @@ func receiver(client *ClientBar) {
 			continue
 		}
 
-		if err := ClientRedis.Publish(Ctx, WebsocketChannel, string(msg)); err != nil {
-			ErrorLogger.Println("Error publishing message:", err)
-		}
+		fmt.Println("publish:", msg)
+		sendInRedisWebsocketChannel(msg)
 	}
 }
 
 func Broadcaster() {
 	for {
-		msgCl := <-Broadcast
+		msg := <-Broadcast
 		for client := range Clients {
-			if client.RoomId == msgCl.RoomId {
-				err := client.Conn.WriteJSON(Message{Type: msgCl.Type, Data: msgCl.Data})
+			if client.RoomId == msg.RoomId {
+				err := client.Conn.WriteJSON(Message{Type: msg.Type, Data: msg.Data})
 
 				if err != nil {
 					ErrorLogger.Println("Error write message: " + err.Error())
@@ -195,6 +204,7 @@ func RedisReceiver() {
 			}
 			msg.Client = client
 			BroadcastCreateOrder <- &msg
+			fmt.Println("Doing: ", m, " \n", msg)
 		} else if m.Type == "OrderGive" {
 			var msg OrderGiveMessage
 			err := json.Unmarshal(m.Data, &msg)
@@ -215,6 +225,11 @@ func RedisReceiver() {
 			if err := DB.Unscoped().Delete(&order).Error; err != nil {
 				ErrorLogger.Println("Error delete order ", err)
 			}
+			fmt.Println("Doing: ", m, " \n", msg)
+		}
+		if m.Type == "createOrder" {
+			Broadcast <- &m
+			fmt.Println("Doing: ", m, " \n", msg)
 		}
 	}
 }
