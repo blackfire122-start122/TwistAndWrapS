@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -51,7 +53,7 @@ func deleteClient(client *ClientBar) {
 
 func sendInRedisWebsocketChannel(msg interface{}) {
 	if err := ClientRedis.Publish(Ctx, WebsocketChannel, msg); err != nil {
-		if err.Val() == 0 {
+		if err.Err() == redis.ErrClosed || strings.Contains(err.String(), "actively refused") {
 			_ = ReconnectToRedis()
 		} else {
 			ErrorLogger.Println("Error publishing message:", err)
