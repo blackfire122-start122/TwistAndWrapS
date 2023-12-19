@@ -3,6 +3,7 @@ package internal
 import (
 	. "TwistAndWrapS/pkg"
 	. "TwistAndWrapS/pkg/logging"
+	"context"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -220,8 +221,8 @@ func GetAllFoods(c *gin.Context) {
 type FormChangeUser struct {
 	Username string                `form:"Username" binding:"required"`
 	Email    string                `form:"Email" binding:"required"`
-	Phone    string                `form:"Phone" binding:"required"`
-	Image    *multipart.FileHeader `form:"Image" binding:"required"`
+	Phone    string                `form:"Phone" binding:"omitempty"`
+	Image    *multipart.FileHeader `form:"Image" binding:"-"`
 }
 
 func ChangeUser(c *gin.Context) {
@@ -244,10 +245,10 @@ func ChangeUser(c *gin.Context) {
 	if form.Image.Filename == "" && form.Image.Size == 0 {
 		ImageName = user.Image
 	} else {
-		if err := c.SaveUploadedFile(form.Image, "./media/UserImages/"+user.Username+form.Image.Filename); err != nil {
+		if err := os.Remove("./" + user.Image); err != nil {
 			ErrorLogger.Println(err.Error())
 		}
-		if err := os.Remove("./" + user.Image); err != nil {
+		if err := c.SaveUploadedFile(form.Image, "./media/UserImages/"+user.Username+form.Image.Filename); err != nil {
 			ErrorLogger.Println(err.Error())
 		}
 		ImageName = "media/UserImages/" + user.Username + form.Image.Filename
@@ -366,31 +367,32 @@ func GetTypes(c *gin.Context) {
 }
 
 func GetAllWorkedBars(c *gin.Context) {
-	loginUser, _ := CheckSessionUser(c.Request)
-
-	if !loginUser {
-		c.Writer.WriteHeader(http.StatusUnauthorized)
+	keys, err := ClientRedis.Keys(context.Background(), "*").Result()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve client keys"})
 		return
 	}
 
-	var clients []ClientBarDB
+	clients := make([]map[string]string, 0)
 
-	DB.Preload("Bar").Find(&clients)
-
-	resp := make([]map[string]string, len(clients))
-
-	for i, cl := range clients {
-		item := make(map[string]string)
-		item["id"] = strconv.FormatUint(cl.Bar.Id, 10)
-		item["idBar"] = cl.Bar.IdBar
-		item["address"] = cl.Bar.Address
-		item["longitude"] = strconv.FormatFloat(cl.Bar.Longitude, 'f', -1, 64)
-		item["latitude"] = strconv.FormatFloat(cl.Bar.Latitude, 'f', -1, 64)
-
-		resp[i] = item
+	var bars []Bar
+	if err := DB.Find(&bars, "id IN (?)", keys).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve bars from database"})
+		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	for _, bar := range bars {
+		item := make(map[string]string)
+		item["id"] = strconv.FormatUint(bar.Id, 10)
+		item["idBar"] = bar.IdBar
+		item["address"] = bar.Address
+		item["longitude"] = strconv.FormatFloat(bar.Longitude, 'f', -1, 64)
+		item["latitude"] = strconv.FormatFloat(bar.Latitude, 'f', -1, 64)
+
+		clients = append(clients, item)
+	}
+
+	c.JSON(http.StatusOK, clients)
 }
 
 type Food struct {
@@ -457,19 +459,27 @@ func OrderFood(c *gin.Context) {
 		return
 	}
 
-	var client ClientBarDB
-
-	if err := DB.Preload("Bar").First(&client, "bar_id=?", bar.Id).Error; err != nil {
-		ErrorLogger.Println("Error find client:", err.Error())
-	}
-
 	data, err := json.Marshal(MsgToBarCreateOrder{FoodIdCount: foodIdCount, Time: form.Time})
 	if err != nil {
 		c.Writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	msg := &Message{Type: "createOrder", Data: data, RoomId: client.RoomId}
+	sessionRedisStr, err := ClientRedis.Get(context.Background(), strconv.FormatUint(bar.Id, 10)).Result()
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var sessionRedis BarSessionInRedis
+
+	err = json.Unmarshal([]byte(sessionRedisStr), &sessionRedis)
+	if err != nil {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	msg := &Message{Type: "createOrder", Data: data, RoomId: sessionRedis.RoomId}
 
 	m, err := json.Marshal(msg)
 	if err != nil {
@@ -481,7 +491,7 @@ func OrderFood(c *gin.Context) {
 
 	for {
 		m := <-BroadcastCreateOrder
-		if m.Client.RoomId == client.RoomId {
+		if m.Client.RoomId == sessionRedis.RoomId {
 			orderTime, err := time.Parse("15:04", form.Time)
 			if err != nil {
 				c.Writer.WriteHeader(http.StatusBadRequest)

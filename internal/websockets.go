@@ -3,12 +3,16 @@ package internal
 import (
 	. "TwistAndWrapS/pkg"
 	. "TwistAndWrapS/pkg/logging"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -46,19 +50,24 @@ var BroadcastCreateOrder = make(chan *CreateOrderMessage)
 
 func deleteClient(client *ClientBar) {
 	delete(Clients, client)
-	if err := DB.Unscoped().Delete(ClientBarDB{}, "room_id = ?", client.RoomId).Error; err != nil {
-		ErrorLogger.Println(err.Error())
+	err := ClientRedis.Del(context.Background(), strconv.FormatUint(client.Bar.Id, 10))
+	if err != nil {
+		ErrorLogger.Println("Error deleting key from Redis:", err)
 	}
 }
 
 func sendInRedisWebsocketChannel(msg interface{}) {
-	if err := ClientRedis.Publish(Ctx, WebsocketChannel, msg); err != nil {
-		if err.Err() == redis.ErrClosed || strings.Contains(err.String(), "actively refused") {
+	result := ClientRedis.Publish(Ctx, WebsocketChannel, msg)
+	if result.Err() != nil {
+		ErrorLogger.Println("Error publishing message:", result.Err())
+		fmt.Println("Publish result:", result)
+		if errors.Is(result.Err(), redis.ErrClosed) || strings.Contains(result.Err().Error(), "actively refused") {
 			_ = ReconnectToRedis()
 		} else {
-			ErrorLogger.Println("Error publishing message:", err)
+			ErrorLogger.Println("Error publishing message:", result.Err())
 		}
 	}
+
 }
 
 func receiver(client *ClientBar) {
@@ -90,7 +99,6 @@ func receiver(client *ClientBar) {
 			continue
 		}
 
-		fmt.Println("publish:", msg)
 		sendInRedisWebsocketChannel(msg)
 	}
 }
@@ -136,16 +144,26 @@ func WsChat(c *gin.Context) {
 		return
 	}
 
-	client := ClientBar{Conn: conn, RoomId: roomId, Bar: bar}
-	Clients[&client] = true
+	client := &ClientBar{Conn: conn, RoomId: roomId, Bar: bar}
+	Clients[client] = true
 
-	if err := DB.Create(&ClientBarDB{RoomId: roomId, Bar: bar}).Error; err != nil {
+	jsonData, err := json.Marshal(BarSessionInRedis{
+		RemoteAddr: conn.RemoteAddr().String(),
+		RoomId:     roomId,
+	})
+
+	if err != nil {
 		ErrorLogger.Println(err.Error())
+	}
+
+	err = ClientRedis.Set(c.Request.Context(), strconv.FormatUint(bar.Id, 10), jsonData, 0).Err()
+	if err != nil {
+		log.Println("Error storing session in Redis:", err)
 		return
 	}
 
-	go receiver(&client)
-	go pingPong(&client)
+	go receiver(client)
+	go pingPong(client)
 }
 
 func pingPong(client *ClientBar) {
@@ -169,12 +187,17 @@ func pingPong(client *ClientBar) {
 
 func RedisReceiver() {
 	PubSub := ClientRedis.Subscribe(Ctx, WebsocketChannel)
-	defer PubSub.Close()
+	defer func(PubSub *redis.PubSub) {
+		err := PubSub.Close()
+		if err != nil {
+			ErrorLogger.Println(err.Error())
+		}
+	}(PubSub)
 
 	for {
 		msg, err := PubSub.ReceiveMessage(Ctx)
 		if err != nil {
-			fmt.Println("Error receiving message:", err)
+			ErrorLogger.Println(err.Error())
 			return
 		}
 
@@ -186,9 +209,9 @@ func RedisReceiver() {
 
 		var client *ClientBar
 
-		for bar, _ := range Clients {
-			if bar.RoomId == m.RoomId {
-				client = bar
+		for cl := range Clients {
+			if cl.RoomId == m.RoomId {
+				client = cl
 				break
 			}
 		}
@@ -202,36 +225,35 @@ func RedisReceiver() {
 			err := json.Unmarshal(m.Data, &msg)
 			if err != nil {
 				ErrorLogger.Println("Error unmarshal create order msg: ", err)
-				return
+				continue
 			}
 			msg.Client = client
 			BroadcastCreateOrder <- &msg
-			fmt.Println("Doing: ", m, " \n", msg)
 		} else if m.Type == "OrderGive" {
 			var msg OrderGiveMessage
 			err := json.Unmarshal(m.Data, &msg)
 			if err != nil {
 				ErrorLogger.Println("Error unmarshal create order msg: ", err)
-				return
+				continue
 			}
 
 			var order Order
 			if err := DB.Preload("OrderProducts").First(&order, "order_id=?", msg.Id).Error; err != nil {
 				ErrorLogger.Println("Error not found order ", err)
+				continue
 			}
 			for _, orderProduct := range order.OrderProducts {
 				if err := DB.Unscoped().Delete(&orderProduct).Error; err != nil {
 					ErrorLogger.Println("Error deleting order product: ", err)
+					continue
 				}
 			}
 			if err := DB.Unscoped().Delete(&order).Error; err != nil {
 				ErrorLogger.Println("Error delete order ", err)
 			}
-			fmt.Println("Doing: ", m, " \n", msg)
 		}
 		if m.Type == "createOrder" {
 			Broadcast <- &m
-			fmt.Println("Doing: ", m, " \n", msg)
 		}
 	}
 }

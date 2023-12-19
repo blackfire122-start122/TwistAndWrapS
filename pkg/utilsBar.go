@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+type BarSessionInRedis struct {
+	RemoteAddr string `json:"remoteAddr"`
+	RoomId     string `json:"roomId"`
+}
+
 type BarLogin struct {
 	IdBar    string
 	Password string

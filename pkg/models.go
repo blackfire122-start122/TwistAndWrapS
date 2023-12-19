@@ -74,13 +74,6 @@ type Bar struct {
 	Latitude  float64
 }
 
-type ClientBarDB struct {
-	gorm.Model
-	RoomId string
-	Bar    Bar `gorm:"foreignKey:BarId"`
-	BarId  uint64
-}
-
 func init() {
 	db, err := gorm.Open(sqlite.Open("database.db"), &gorm.Config{})
 	DB = db
@@ -89,7 +82,7 @@ func init() {
 		panic("failed to connect database")
 	}
 
-	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, &Bar{}, &TypeProduct{}, Order{}, &OrderProduct{}, ClientBarDB{})
+	err = DB.AutoMigrate(&User{}, &Admin{}, &Product{}, &Bar{}, &TypeProduct{}, Order{}, &OrderProduct{})
 	if err != nil {
 		panic("Error autoMigrate: ")
 	}
